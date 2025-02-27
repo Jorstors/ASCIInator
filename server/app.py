@@ -1,15 +1,33 @@
 #!/usr/bin/python3
 
+from flask_limiter.util import get_remote_address
+from flask_limiter import Limiter, RateLimitExceeded
 from flask import Flask, request
 from PIL import Image
 import requests
 import os.path
+import base64
 import flask
 import sys
 import io
 
 POSITIVE_CHARSET = ' .:-=+*#%@'
-NEGATIVE_CHARSET = POSITIVE_CHARSET[::-1]
+NEGATIVE_CHARSET = POSITIVE_CHARSET[::-1] # reversed POSITIVE_CHARSET
+PROMPT_PREFIX = "make a drawing of a high contrast, black and white, minimalistic "
+MODEL = "@cf/black-forest-labs/flux-1-schnell"
+
+CLOUDFLARE_ACCOUNT_ID = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+CLOUDFLARE_API_KEY = os.getenv('CLOUDFLARE_API_KEY')
+
+if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_KEY:
+    raise RuntimeError("Cloudflare account ID and API key must be set in environment variables")
+
+CLOUDFLARE_URL = f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/run/{MODEL}"
+cloudflare_session = requests.Session()
+cloudflare_session.headers.update({
+    'Authorization': f'Bearer {CLOUDFLARE_API_KEY}',
+    'Content-Type': 'application/json'
+})
 
 # Add image_to_ascii/ as a module search directory
 try:
@@ -19,46 +37,51 @@ except ImportError as e:
     print("Failed to import image_to_ascii", e.with_traceback())
     sys.exit(1)
 
+app = Flask(__name__)
+limiter = Limiter(get_remote_address, app=app, headers_enabled=True)
+
 # Function to call the text-to-image generation endpoint
-# Adapted from Janus demo code
-def generate_images(prompt, seed=None, guidance=5.0):
+def generate_images(prompt):
     data = {
-        'prompt': prompt,
-        'seed': seed,
-        'guidance': guidance
+        'prompt': prompt
     }
-    response = requests.post(generate_images_url, data=data, stream=True)
+    response = cloudflare_session.post(CLOUDFLARE_URL, json=data, stream=True)
     
     if not response.ok:
+        print("Server returned an error: " + response.text)
         raise RuntimeError("Server returned an error")
 
-    try:
-        buffer = io.BytesIO()
-        for chunk in response.iter_content(chunk_size=128*1024): # 128KiB
-            if chunk:
-                buffer.write(chunk)
+    response_data = response.json()
+    image_data = response_data.get('result', {}).get('image')
 
-        buffer.seek(0)
-        image = Image.open(buffer)
-        image.save(prompt + ".png")
+    if not image_data:
+        print("No image data found: " + response.text)
+        raise RuntimeError("No image data found in the response")
 
-    except Exception as e:
-        raise RuntimeError("Error processing image", e)
-
-app = Flask(__name__)
+    image_bytes = base64.b64decode(image_data)
+    image = Image.open(io.BytesIO(image_bytes))
+    image.save(f"{prompt}.jpg")
 
 @app.route("/get-art")
 def getArt():
-    filename = request.args.get("prompt") + ".png"
-    if filename is None:
-        return "Invalid request: prompt is required"
+    if "prompt" not in request.args:
+        return "Invalid request: prompt is required", 400
+    if len(request.args["prompt"]) > 500:
+        return "Invalid request: prompt too long", 400
+
+    prompt = PROMPT_PREFIX + request.args["prompt"]
+    filename = prompt + ".jpg"
     if not os.path.isfile(filename):
-        generate_images(request.args["prompt"])
+        try:
+            with limiter.limit("5/day"):
+                generate_images(prompt)
+        except RuntimeError:
+            return "Failed to generate image", 503
+        except RateLimitExceeded:
+            return "Rate limit exceeded", 429
 
     s = request.args.get("size", 1, type=int)
-    asc = image_to_ascii(filename, size=(s,s), charset=NEGATIVE_CHARSET)
-
-    return asc
+    return image_to_ascii(filename, size=(s,s), charset=NEGATIVE_CHARSET)
 
 @app.route("/")
 def m():
@@ -67,11 +90,3 @@ def m():
 @app.route("/public/<path:path>")
 def public(path):
     return flask.send_from_directory("../public", path)
-
-# Endpoint URL
-generate_images_url = "http://localhost:8000/generate_images/"
-
-# Example usage
-if __name__ == "__main__":
-    # Call the image generation API
-    generate_images("A beautiful sunset over a mountain range, digital art.")

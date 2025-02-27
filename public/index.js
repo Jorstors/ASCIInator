@@ -1,5 +1,3 @@
-const appendedPrompts =
-  "make a drawing of a high contrast, black and white, minimalistic ";
 let inputBox = document.getElementById("input");
 let inputButton = document.getElementById("convert");
 let copyButton = document.getElementById("copy");
@@ -76,7 +74,7 @@ async function sizeChange(pos) {
   }
 
   const string = userInput;
-  const baseUrl = `/get-art?prompt=${appendedPrompts}${string}&size=${currentSize}`;
+  const baseUrl = `/get-art?prompt=${string}&size=${currentSize}`;
   const response = await fetch(baseUrl);
   if (!response.ok) {
     loadingID = loading();
@@ -140,8 +138,8 @@ function clearSpinner() {
 async function promptAPI() {
   const string = userInput;
 
-  const baseUrl = `/get-art?prompt=${appendedPrompts}${string}&size=`;
-  for (var i = 2; i < 70; i += 1) {
+  const baseUrl = `/get-art?prompt=${string}&size=`;
+  for (var i = 2; i < currentSize; i += 1) {
     try {
       const response = await fetch(baseUrl + i);
       if (!response.ok) throw new Error("Network response was not ok");
@@ -183,19 +181,6 @@ function debounce(func, timeout = 5 * 1000) {
 }
 
 const prompt = debounce(promptAPI, 3 * 1000);
-
-// @app.route("/get-art")
-// def getArt():
-//     filename = request.args.get("prompt") + ".png"
-//     if filename is None:
-//         return "Invalid request: prompt is required"
-//     if not os.path.isfile(filename):
-//         generate_images(request.args["prompt"])
-
-//     s = request.args.get("size", 1, type=int)
-//     asc = image_to_ascii(filename, size=(s,s), charset=' .:-=+*#%@')
-
-//     return asc
 
 // Load placeholder ASCII art in the output box
 fetch("public/wormy.txt")

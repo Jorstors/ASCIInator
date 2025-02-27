@@ -4,3 +4,4 @@ numpy
 pillow
 requests
 waitress
+flask-limiter

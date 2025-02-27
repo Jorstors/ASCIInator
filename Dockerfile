@@ -20,8 +20,8 @@ ENV PYTHONUNBUFFERED=1
 # Install the required packages.
 USER root
 
-# Install the required packages (apt, dos2unix, openssh-client).
-RUN apt-get update && apt-get install -y dos2unix && apt-get install -y openssh-client
+# Install the required packages (dos2unix, openssh-client).
+RUN apt-get update && apt-get install -y dos2unix openssh-client
 
 # Set the working directory in the container to /app.
 WORKDIR /app
