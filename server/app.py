@@ -37,8 +37,21 @@ except ImportError as e:
     print("Failed to import image_to_ascii", e.with_traceback())
     sys.exit(1)
 
+def get_cloudflare_user_ip():
+    # Throws an exception if the header does not exist, because if the header isn't
+    # there for legitimate requests, it's probably spoofable, which is bad.
+    return request.headers["CF-Connecting-IP"]
+
+# If we're on Cloudflare (defined in `entrypoint.sh`), use the proxied IP address
+if os.getenv('IS_CLOUDFLARE'):
+    print("Cloudflare proxy headers will be read for the client's real IP")
+    get_ip_func = get_cloudflare_user_ip
+else:
+    print("You have not told the app that it's running on Cloudflare. If you are running behind a proxy, the rate limiting may not work as expected!")
+    get_ip_func = get_remote_address
+
 app = Flask(__name__)
-limiter = Limiter(get_remote_address, app=app, headers_enabled=True)
+limiter = Limiter(get_ip_func, app=app, headers_enabled=True)
 
 # Function to call the text-to-image generation endpoint
 def generate_images(prompt):
