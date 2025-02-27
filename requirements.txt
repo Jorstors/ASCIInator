@@ -1,7 +1,8 @@
-flask
 sty
+flask
 numpy
 pillow
 requests
 waitress
 flask-limiter
+flask-compress

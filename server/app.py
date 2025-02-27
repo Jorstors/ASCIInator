@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 
-from flask_limiter.util import get_remote_address
 from flask_limiter import Limiter, RateLimitExceeded
+from flask_limiter.util import get_remote_address
+from flask_compress import Compress
 from flask import Flask, request
 from PIL import Image
 import requests
@@ -51,6 +52,7 @@ else:
     get_ip_func = get_remote_address
 
 app = Flask(__name__)
+Compress(app)
 limiter = Limiter(get_ip_func, app=app, headers_enabled=True)
 
 # Function to call the text-to-image generation endpoint
