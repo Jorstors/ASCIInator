@@ -8,7 +8,9 @@ let imageDescriptor = document.getElementById("image-descriptor");
 let plusButton = document.getElementById("plus-button");
 let minusButton = document.getElementById("minus-button");
 let recievedASCII = false;
-let currentSize = 69; // Default size of the ASCII art
+let currentSize = 60; // Default size of the ASCII art
+
+let currentArt = new Map();
 
 inputBox.addEventListener("keyup", function (event) {
   if (event.key === "Enter" && inputBox.value) {
@@ -45,7 +47,7 @@ copyButton.addEventListener("click", function () {
   // Copy the text from the output div
   let rawText = outputBox.innerText;
   // Clean up text a little: remove trailing whitepsace and blank lines
-  var text = rawText.replace(/\s+$/mg, "").replace(/\n{2,}/g, "\n");
+  let text = rawText.replace(/\s+$/mg, "").replace(/\n{2,}/g, "\n");
   if (text.startsWith("\n")) text = text.slice(1);
   let lines = text.split("\n");
   let minSpaces = Math.min(...lines.map(line => line.match(/^\s*/)[0].length));
@@ -65,6 +67,26 @@ minusButton.addEventListener("click", function () {
   sizeChangeDebounced(-1);
 });
 
+async function getSize(size) {
+  if (!currentArt.has(size)) {
+    recievedASCII = false;
+    const string = userInput;
+    const baseUrl = `/api/v1/get-art?prompt=${string}&size=${size}`;
+    const response = await fetch(baseUrl);
+    if (!response.ok) {
+      loadingID = loading();
+      throw new Error("Network response was not ok");
+    }
+    const resp = await response.text();
+    const data = JSON.parse(resp);
+    for (const [key, value] of Object.entries(data)) {
+      currentArt.set(parseInt(key), value);
+    }
+    recievedASCII = true;
+  }
+  return currentArt.get(size);
+}
+
 async function sizeChange(pos) {
   // Send a request to the backend to send a larger ASCII art
   console.log("Current size:", currentSize);
@@ -79,17 +101,10 @@ async function sizeChange(pos) {
     return;
   }
 
-  const string = userInput;
-  const baseUrl = `/get-art?prompt=${string}&size=${currentSize}`;
-  const response = await fetch(baseUrl);
-  if (!response.ok) {
-    loadingID = loading();
-    throw new Error("Network response was not ok");
-  }
-  const data = await response.text();
+  const art = await getSize(currentSize);
   // Update the output box with the ASCII art
   clearSpinner();
-  outputBox.innerText = data;
+  outputBox.innerText = art;
   recievedASCII = true;
 }
 
@@ -142,37 +157,39 @@ function clearSpinner() {
 
 // API call to backend through HTTPS request
 async function promptAPI() {
-  const string = userInput;
+  currentArt.clear();
+  let art;
+  try {
+    art = await getSize(4);
+  } catch (error) {
+    // If an error occurs, display an error message and break the loop
+    clearSpinner();
 
-  const baseUrl = `/get-art?prompt=${string}&size=`;
-  for (var i = 2; i < currentSize; i += 1) {
-    try {
-      const response = await fetch(baseUrl + i);
-      if (!response.ok) throw new Error("Network response was not ok");
-      const data = await response.text();
-      // Update the output box with the ASCII art
-      clearSpinner();
-      outputBox.innerText = data;
-      recievedASCII = true;
-    } catch (error) {
-      // If an error occurs, display an error message and break the loop
-      clearSpinner();
+    // Load placeholder ASCII art in the output box
+    fetch("public/notavailable.txt")
+      .then((response) => response.text())
+      .then((data) => {
+        outputBox.innerHTML = data;
+      })
+      .catch((error) =>
+        console.error("Error loading error ASCII art:", error)
+      );
+    recievedASCII = false;
+    // Log the error
+    console.error("Error fetching data:", error);
+  }
 
-      // Load placeholder ASCII art in the output box
-      fetch("public/notavailable.txt")
-        .then((response) => response.text())
-        .then((data) => {
-          outputBox.innerHTML = data;
-        })
-        .catch((error) =>
-          console.error("Error loading error ASCII art:", error)
-        );
-      recievedASCII = false;
-      // Log the error
-      console.error("Error fetching data:", error);
-      break;
+  clearSpinner();
+  recievedASCII = true;
+  let i = 4;
+  async function loadNext() {
+    outputBox.innerText = await getSize(i);
+    i += 4;
+    if (i <= currentSize) {
+      setTimeout(loadNext, 100);
     }
   }
+  loadNext();
 }
 
 // Debounced version of the prompt function

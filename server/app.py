@@ -9,6 +9,7 @@ import requests
 import os.path
 import base64
 import flask
+import json
 import sys
 import io
 
@@ -77,10 +78,12 @@ def generate_images(prompt):
     image = Image.open(io.BytesIO(image_bytes))
     image.save(f"{prompt}.jpg")
 
-@app.route("/get-art")
+@app.route("/api/v1/get-art")
 def getArt():
     if "prompt" not in request.args:
         return "Invalid request: prompt is required", 400
+    if "size" not in request.args:
+        return "Invalid request: size is required", 400
     if len(request.args["prompt"]) > 500:
         return "Invalid request: prompt too long", 400
 
@@ -95,8 +98,19 @@ def getArt():
         except RateLimitExceeded:
             return "Rate limit exceeded", 429
 
-    s = request.args.get("size", 1, type=int)
-    return image_to_ascii(filename, size=(s,s), charset=NEGATIVE_CHARSET)
+    image = Image.open(filename)
+    s = request.args.get("size", 4, type=int)
+    if s < 100:
+        minsize = 4
+        maxsize = 100
+    else:
+        # Round to the nearest 50
+        minsize = (s // 4) * 4
+        maxsize = minsize + 48
+    data = {}
+    for i in range(minsize, maxsize + 1, 4):
+        data[i] = image_to_ascii(image, size=(i,i), charset=NEGATIVE_CHARSET)
+    return json.dumps(data)
 
 @app.route("/")
 def m():
