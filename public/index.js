@@ -3,7 +3,7 @@ let inputButton = document.getElementById("convert");
 let copyButton = document.getElementById("copy");
 let outputBox = document.getElementById("output");
 let userInput = "";
-let loadingID;
+let loadingID = 0;
 let imageDescriptor = document.getElementById("image-descriptor");
 let plusButton = document.getElementById("plus-button");
 let minusButton = document.getElementById("minus-button");
@@ -20,8 +20,7 @@ inputBox.addEventListener("keyup", function (event) {
     outputBox.innerText = "";
     inputBox.value = "";
     // If there is a spinner running, clear it
-    if (loadingID) clearSpinner();
-    loadingID = loading();
+    loading();
     recievedASCII = false;
     // Call the API with the user input
     prompt();
@@ -35,9 +34,7 @@ inputButton.addEventListener("click", function () {
   // Clear the input and output boxes
   outputBox.innerText = "";
   inputBox.value = "";
-  // If there is a spinner running, clear it
-  if (loadingID) clearSpinner();
-  loadingID = loading();
+  loading();
   recievedASCII = false;
   // Call the API with the user input
   prompt();
@@ -74,8 +71,8 @@ async function getSize(size) {
     const baseUrl = `/api/v1/get-art?prompt=${string}&size=${size}`;
     const response = await fetch(baseUrl);
     if (!response.ok) {
-      loadingID = loading();
-      throw new Error("Network response was not ok");
+      loading();
+      throw new Error(await response.text());
     }
     const resp = await response.text();
     const data = JSON.parse(resp);
@@ -135,11 +132,14 @@ const sizeChangeDebounced = debounceSizeChange(sizeChange, 1 * 1000);
 let asciiSpinner = "▉▊▋▍▎▏▎▍▋▊▉";
 
 function loading() {
+  if (loadingID) {
+    clearSpinner();
+  }
   // Set the font size large enough to see the spinner
   outputBox.style.fontSize = "2.5rem";
-  // Every 700ms, update the spinner in the output div
+  // Update the spinner in the output div repeatedly
   let i = 0;
-  return setInterval(() => {
+  loadingID = setInterval(() => {
     outputBox.innerText = "▉▉▉" + asciiSpinner[i];
     i += 1;
     if (i >= asciiSpinner.length) {
@@ -155,35 +155,43 @@ function clearSpinner() {
   outputBox.style.fontSize = "var(--ASCII-font-size)";
 }
 
+function handleError(error) {
+  clearSpinner();
+  recievedASCII = false;
+  const msg = error.message;
+  if (msg.startsWith("{")) {
+    const data = JSON.parse(msg);
+    console.error("Error fetching data:", data.message);
+    outputBox.innerText = data.figlet;
+    return;
+  }
+
+  // Load placeholder ASCII art in the output box
+  fetch("public/notavailable.txt")
+    .then((response) => response.text())
+    .then((data) => {
+      outputBox.innerHTML = data;
+    })
+    .catch((error) =>
+      console.error("Error loading error ASCII art:", error)
+    );
+  // Log the error
+  console.error("Error fetching data:", error);
+}
+
 // API call to backend through HTTPS request
 async function promptAPI() {
   currentArt.clear();
-  let art;
-  try {
-    art = await getSize(4);
-  } catch (error) {
-    // If an error occurs, display an error message and break the loop
-    clearSpinner();
-
-    // Load placeholder ASCII art in the output box
-    fetch("public/notavailable.txt")
-      .then((response) => response.text())
-      .then((data) => {
-        outputBox.innerHTML = data;
-      })
-      .catch((error) =>
-        console.error("Error loading error ASCII art:", error)
-      );
-    recievedASCII = false;
-    // Log the error
-    console.error("Error fetching data:", error);
-  }
-
-  clearSpinner();
-  recievedASCII = true;
   let i = 4;
   async function loadNext() {
-    outputBox.innerText = await getSize(i);
+    try {
+      const text = await getSize(i);
+      clearSpinner();
+      outputBox.innerText = text;
+    } catch (error) {
+      handleError(error);
+      return;
+    }
     i += 4;
     if (i <= currentSize) {
       setTimeout(loadNext, 100);

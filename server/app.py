@@ -5,6 +5,7 @@ from flask_limiter.util import get_remote_address
 from flask_compress import Compress
 from flask import Flask, request
 from PIL import Image
+import pyfiglet
 import requests
 import os.path
 import base64
@@ -78,8 +79,17 @@ def generate_images(prompt):
     image = Image.open(io.BytesIO(image_bytes))
     image.save(f"{prompt}.jpg")
 
+def format_error(msg):
+    error = {
+        'message': msg,
+        'figlet': pyfiglet.figlet_format(msg),
+    }
+    return json.dumps(error)
+
 @app.route("/api/v1/get-art")
 def getArt():
+    # Don't figlet these because they shouldn't occur if the user
+    # is using the web client as intended.
     if "prompt" not in request.args:
         return "Invalid request: prompt is required", 400
     if "size" not in request.args:
@@ -91,12 +101,12 @@ def getArt():
     filename = prompt + ".jpg"
     if not os.path.isfile(filename):
         try:
-            with limiter.limit("5/day"):
+            with limiter.limit("50/day"):
                 generate_images(prompt)
-        except RuntimeError:
-            return "Failed to generate image", 503
+        except (RuntimeError, IOError):
+            return format_error("Failed to generate image!"), 503
         except RateLimitExceeded:
-            return "Rate limit exceeded", 429
+            return format_error("Rate limit exceeded!"), 429
 
     image = Image.open(filename)
     s = request.args.get("size", 4, type=int)

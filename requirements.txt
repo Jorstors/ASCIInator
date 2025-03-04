@@ -2,6 +2,7 @@ sty
 flask
 numpy
 pillow
+pyfiglet
 requests
 waitress
 flask-limiter
