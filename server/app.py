@@ -114,7 +114,7 @@ def getArt():
         minsize = 4
         maxsize = 100
     else:
-        # Round to the nearest 50
+        # Round minsize down to the nearest multiple of 4, and include the next 12 sizes (13 sizes total)
         minsize = (s // 4) * 4
         maxsize = minsize + 48
     data = {}
