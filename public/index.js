@@ -43,7 +43,13 @@ inputButton.addEventListener("click", function () {
 
 copyButton.addEventListener("click", function () {
   // Copy the text from the output div
-  let text = outputBox.innerText;
+  let rawText = outputBox.innerText;
+  // Clean up text a little: remove trailing whitepsace and blank lines
+  var text = rawText.replace(/\s+$/mg, "").replace(/\n{2,}/g, "\n");
+  if (text.startsWith("\n")) text = text.slice(1);
+  let lines = text.split("\n");
+  let minSpaces = Math.min(...lines.map(line => line.match(/^\s*/)[0].length));
+  text = lines.map(line => line.slice(minSpaces)).join("\n");
   navigator.clipboard.writeText(text);
   console.log("Copied to clipboard!");
 });
@@ -68,7 +74,7 @@ async function sizeChange(pos) {
     currentSize += 4;
     return;
   }
-  if (currentSize >= 85) {
+  if (currentSize >= 250) {
     currentSize -= 4;
     return;
   }

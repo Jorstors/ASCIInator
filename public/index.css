@@ -239,17 +239,19 @@ a:after {
   border: 4px dashed var(--primary-color);
   margin: 0 auto;
   position: relative;
+  overflow: hidden;
 }
 
 .output-inner {
   white-space: pre-wrap;
-  height: 100%;
-  width: 100%;
+  width: 400%;
+  height: 400%;
+  margin-left: -150%; /* exactly -(width  - 100%) / 2 */
+  margin-top: -84%;   /* couldn't find an exact formula; trial and error */
   display: flex;
   justify-content: center;
   align-items: center;
   font-size: var(--ASCII-font-size);
-  overflow: hidden;
 }
 
 .output::after {
