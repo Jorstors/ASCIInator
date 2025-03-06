@@ -45,16 +45,19 @@ def get_cloudflare_user_ip():
     # there for legitimate requests, it's probably spoofable, which is bad.
     return request.headers["CF-Connecting-IP"]
 
+app = Flask(__name__)
+
 # If we're on Cloudflare (defined in `entrypoint.sh`), use the proxied IP address
 if os.getenv('IS_CLOUDFLARE'):
     print("Cloudflare proxy headers will be read for the client's real IP")
+    print("Manual compression will be disabled")
     get_ip_func = get_cloudflare_user_ip
 else:
     print("You have not told the app that it's running on Cloudflare. If you are running behind a proxy, the rate limiting may not work as expected!")
+    print("Manual compression is enabled")
     get_ip_func = get_remote_address
+    Compress(app)
 
-app = Flask(__name__)
-Compress(app)
 limiter = Limiter(get_ip_func, app=app, headers_enabled=True)
 
 # Function to call the text-to-image generation endpoint
