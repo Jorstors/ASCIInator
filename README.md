@@ -42,5 +42,5 @@ Our frontend was built with pure HTML/CSS and JS, and our back end was built wit
 # Contributors
 ### [Justus Jones](https://github.com/Jorstors)
 ### [Dietrich Zacher](https://github.com/dzacher)
-### [Josh Mentor](https://github.com/jmenter1)
+### [Josh Menter](https://github.com/jmenter1)
 ### [Alex Bergman](https://github.com/AlexBergman40)
